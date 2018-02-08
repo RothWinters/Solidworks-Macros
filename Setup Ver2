@@ -1,0 +1,191 @@
+'Version 1.0 BareBones
+Option Explicit
+Dim SAVEASPATH As String
+
+Dim swApp As SldWorks.SldWorks
+Dim swModel As SldWorks.ModelDoc2
+Dim SelMgr As SldWorks.SelectionMgr
+Dim swDraw As SldWorks.DrawingDoc
+Dim swSheet As SldWorks.Sheet
+Dim swView As SldWorks.View
+Dim swSectionView As SldWorks.DrSection
+Dim swModel2 As SldWorks.ModelDoc2
+
+'Dim swModelDocExt As SldWorks.ModelDocExtension
+
+Dim Response As Integer
+Dim ThirdAngle As Boolean
+
+Dim cusPropMgr As SldWorks.CustomPropertyManager
+Dim ConfigNamesArray As Variant
+Dim ConfigName As Variant
+Dim SheetName As String
+
+Dim i, j, k, ViewSelect, ViewNum, DeleteOption As Long
+Dim retval As Boolean
+Dim boolstat As Boolean
+Dim RunCheck As Boolean
+
+Dim Temp1, Temp2 As Variant
+Dim ViewName As String
+
+
+'###MACRO START###
+Sub main()
+Debug.Print ("===============" & vbCrLf & "*****START*****")
+
+'*****SETUP*****
+Dim DrwgTemp As String 'Template File Location
+DrwgTemp = "Y:\Engineering Technical Library\03_Logistics\01_CAD Tools\01_SolidWorks\07_TEMPLATES\OPER SKETCH -A-.drwdot"
+Dim SheetTemp As String 'Same as above but for sheet template
+SheetTemp = "Y:\Engineering Technical Library\03_Logistics\01_CAD Tools\01_SolidWorks\07_TEMPLATES\OPER SHEET -A-.slddrt"
+
+Debug.Print (DrwgTemp)
+Debug.Print (SheetTemp)
+
+'Basic stuff
+Set swApp = Application.SldWorks
+Set swModel = swApp.ActiveDoc
+Set SelMgr = swModel.SelectionManager
+
+'Save Path
+SAVEASPATH = Left(swModel.GetPathName(), Len(swModel.GetPathName()) - Len(swModel.GetTitle()) - 7)
+Debug.Print ("Save Path: " & SAVEASPATH)
+
+'Get Configuration names and set active configuration to raw material
+ConfigNamesArray = swModel.GetConfigurationNames
+Debug.Print ("ConfigNamesArray Size: " & UBound(ConfigNamesArray))
+swModel.ShowConfiguration2 ConfigNamesArray(0)
+Dim ConfigNumber As Integer
+ConfigNumber = swModel.GetConfigurationCount
+
+'Get the amount of times to run the macro
+Dim DocNums() As Variant
+DocNums = GetDocNumbers(ConfigNumber)
+Debug.Print ("Function Return: Document Numbers: " & DocNums(0))
+Debug.Print ("Function Return: Sheets per Document: " & DocNums(1))
+Debug.Print ("Function Return: Extra sheets: " & DocNums(2))
+
+i = 0
+For k = 1 To DocNums(0)
+    'Creating New Document
+    Set swDraw = swApp.NewDocument(DrwgTemp, 0, 0.2794, 0.2159)
+    Debug.Print ("New Doc Created: Yes")
+    Set swModel2 = swDraw
+    swModel2.SetUserPreferenceToggle swUserPreferenceToggle_e.swDisplayOrigins, False
+    Dim SheetNames() As String
+    ReDim SheetNames(0 To ConfigNumber - 1)
+    Dim Numerator, Denominator As Integer
+
+    Dim UIF As Boolean
+    UIF = True
+'******Getting and Checking User Input******
+        Do While UIF = True
+
+                Temp1 = InputBox("Enter Scale Numerator: ", "Numerator")
+                Debug.Print ("Got Numerator Input: " & Temp1)
+
+                If CheckUserInputFF(Temp1) <> 0 Then
+                    Debug.Print ("Numerator Input: Check Okay")
+                    Temp2 = InputBox("Enter Scale Denominator: ", "Denominator")
+                    Debug.Print ("Got Denominator Input: " & Temp2)
+
+                    If CheckUserInputFF(Temp2) <> 0 Then
+                        Debug.Print ("Denominator Input: Check Okay")
+                        Numerator = Temp1
+                        Denominator = Temp2
+                        UIF = False
+
+                    Else
+                    End If
+                Else
+                End If
+        Loop
+    Debug.Print ("User Input Got Gotten")
+    Debug.Print ("Scale: " & Numerator & ":" & Denominator)
+
+
+    Dim LocX, LocY As Double
+    LocX = 0.2
+    LocY = 0.1
+
+Debug.Print ("******Loop Start******")
+'***** Main For Loop **** 'Does the thing
+
+    For j = 1 To DocNums(1) 'UBound(ConfigNamesArray) 'Limiting loop to run while configs are there
+    Debug.Print ("___________" & vbCrLf & "For Loop: 'i' = " & i) 'Telling me where we are (Hopefully it gets past 0)
+
+        SheetName = Left(ConfigNamesArray(i), 3)            'Only works if configs are done as "### Operation"
+        ConfigName = ConfigNamesArray(i)                    'Just getting Config Name (Might remove later)
+        Debug.Print ("Config Name: " & ConfigNamesArray(i))
+        Debug.Print ("Sheet Name: " & SheetName)
+        SheetNames(i) = SheetName
+
+        '**** First Run Check****
+            If j = 1 Then
+                Debug.Print ("####START OF LOOP####")
+                Set swSheet = swDraw.GetCurrentSheet
+                Debug.Print (swSheet.GetName)
+                swSheet.SetScale Numerator, Denominator, False, False
+                Set swView = swDraw.CreateDrawViewFromModelView3(swModel.GetPathName, "*Right", 0.2, 0.1, 0)
+                Debug.Print ("Created front view of Model found at: " & swModel.GetPathName)
+                swView.ReferencedConfiguration = ConfigNamesArray(i)
+                ViewName = swView.GetName2
+                Debug.Print ("View Name: " & ViewName)
+                swDraw.ActivateView (ViewName)
+                swSheet.SetName (SheetNames(i))
+                swDraw.ForceRebuild3 True
+                Debug.Print (swSheet.GetName)
+                Debug.Print ("Activated View: Success")
+
+        '****Not First Run****
+            Else
+                'Creating New sheet
+                retval = swDraw.NewSheet4(SheetName, 0, 0, Numerator, Denominator, True, "", 0.2794, 0.2159, "", 0, 0, 0, 0, 0, 0)
+                Debug.Print ("New Sheet Made: Success")
+                Debug.Print ("Scale set as: " & Numerator & "/" & Denominator)
+                retval = swDraw.InsertModelInPredefinedView(swModel.GetPathName) 'Here we get our views, I need to get only a right side view
+
+                'Establishing Format because for some reason the template wasn't loading (See Line "retval = swDraw.NewSheet4(..." in "First run check
+                swDraw.SetupSheet5 SheetNames(i), swDwgPapersUserDefined, swDwgTemplateNone, Numerator, Denominator, False, "", 0.2794, 0.2159, "Default", True
+                swDraw.SetupSheet5 SheetNames(i), 12, 12, Numerator, Denominator, False, "Y:\Engineering Technical Library\03_Logistics\01_CAD Tools\01_SolidWorks\07_TEMPLATES\OPER SHEET -A-.SLDDRT", 0.2794, 0.2159, "Default", True
+
+                'Add the view from the Model
+                swDraw.CreateDrawViewFromModelView3 swModel.GetPathName, "*Right", LocX, LocY, 0
+                Debug.Print ("View Created from Config: " & ConfigNamesArray(i))
+                Set swView = swDraw.GetFirstView
+
+                'Setting view configuration
+                Do While Not swView Is Nothing
+                    swView.ReferencedConfiguration = ConfigName
+                    Set swView = swView.GetNextView
+                Loop
+
+                ViewNum = ViewSelect
+                swDraw.ForceRebuild3 True
+                Debug.Print ("Force Rebuild: Success")
+
+                'Adding split to second Loop
+                If k = 2 And DocNums(2) <> 0 And j > 1 + DocNums(2) And RunCheck = False Then
+        'If second run and there is a leftover and this wont make it go back to one and it hasn't run before
+                    j = j - DocNums(2)
+                    RunCheck = True
+                    Debug.Print ("RunCheck: True")
+                End If
+                Debug.Print ("Function Return: Document Numbers: " & DocNums(0))
+                Debug.Print ("Function Return: Sheets per Document: " & DocNums(1))
+                Debug.Print ("Function Return: Extra sheets: " & DocNums(2))
+                Debug.Print ("****END****")
+           End If
+    Debug.Print ("****Loop end****")
+    i = i + 1 'Keeping the config count stored outside the loop
+    Next j 'Using this to control sheet numbers. Lets see if this baby works!
+
+Next k
+
+Debug.Print ("Function Input: " & ConfigNumber)
+Debug.Print ("Function Return: Document Numbers: " & DocNums(0))
+Debug.Print ("Function Return: Sheets per Document: " & DocNums(1))
+Debug.Print ("Function Return: Extra sheets: " & DocNums(2))
+Debug.Print ("****END****")
+End Sub
