@@ -1,0 +1,92 @@
+' ******************************************************************************
+' C:\Users\jboire\AppData\Local\Temp\swx5500\Macro1.swb - macro recorded on 01/30/18 by jboire
+' ******************************************************************************
+Dim swApp As SldWorks.SldWorks
+Dim swModel As SldWorks.ModelDoc2
+Dim swDraw As SldWorks.DrawingDoc
+Dim swView As SldWorks.View
+Dim swSheet As SldWorks.Sheet
+
+Dim vSheetProperties As Variant
+
+Dim scale1 As Double
+Dim scale2 As Double
+
+Dim Point As SldWorks.MathPoint
+Dim myUtil As SldWorks.MathUtility
+
+Sub main()
+Debug.Print (vbCrLf & "******MACRO START******")
+
+'***Setup***
+Set swApp = Application.SldWorks
+Set swModel = swApp.ActiveDoc
+Set swDraw = swApp.ActiveDoc
+
+
+Debug.Print ("###Definitions: Success")
+
+'Get MathUtilities for 3D points
+Set myUtil = swApp.GetMathUtility
+Debug.Print ("***Utilities Activated***")
+
+'Define Coordinates for the block
+Dim Coords(2) As Double
+'Coords(0) = 0.44115 'X
+'Coords(1) = 0.40355 'Y
+'Coords(2) = 0       'Z
+'Debug.Print ("***Coords Established***")
+
+'Block File Location
+Dim BlockPath As String
+BlockPath = "Y:\Engineering Technical Library\03_Logistics\01_CAD Tools\01_SolidWorks\01_Blocks\01_Setup Blocks (Chucks, Part Notes)\A INITIAL RELEASE.SLDBLK"
+
+'Sheet Names Array created
+Dim SheetNames() As String
+Dim SheetNum As Integer
+SheetNum = swDraw.GetSheetCount
+ReDim SheetNames(SheetNum)
+SheetNames = swDraw.GetSheetNames()
+
+Debug.Print ("Sheet Names Array Populated: Success")
+Debug.Print ("Array size: " & UBound(SheetNames))
+
+'***Loop to run through pages adding the block***
+Debug.Print ("******FOR LOOP START******")
+For i = 1 To swDraw.GetSheetCount
+    
+    'Activate Sheet
+    Debug.Print ("Run Number: " & i)
+    swDraw.ActivateSheet (SheetNames(i - 1))
+    Debug.Print ("Activated Sheet: " & SheetNames(i - 1) & " Success")
+
+    'Getting sheet info
+    Set swSheet = swDraw.Sheet(SheetNames(i - 1))
+    vSheetProperties = swSheet.GetProperties
+    scale1 = vSheetProperties(2)
+    scale2 = vSheetProperties(3)
+    Debug.Print ("Sheet scale1: " & scale1)
+    Debug.Print ("Sheet scale2: " & scale2)
+    
+    
+    'Define Coordinates for the block
+    Coords(0) = 0.220575 * (scale2 / scale1) 'X
+    Coords(1) = 0.20177 * (scale2 / scale1)  'Y
+    Coords(2) = 0                            'Z
+    Debug.Print ("***Coords Established***")
+    
+    'Point given definition
+    Set Point = myUtil.CreatePoint(Coords)
+    Debug.Print ("***Point Created***")
+    
+    'Add Block to Sheet
+    Dim myBlockDefinition As SketchBlockDefinition
+    Set myBlockDefinition = swModel.SketchManager.MakeSketchBlockFromFile(Point, BlockPath, False, 0.666666666666667, 0)
+    Debug.Print ("Block Added: Success")
+    
+Next i
+
+'Go back to first page
+swDraw.ActivateSheet SheetNames(0)
+
+End Sub
